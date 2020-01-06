@@ -24,8 +24,7 @@ public class Server {
     private int clientPort;
 
     private int accountBalance = 0;
-
-    ArrayList<Message> savedReplies = new ArrayList<Message>();
+    ArrayList<Message> savedReplies = new ArrayList<>();
 
     public void start() throws IOException {
         serverSocket = new DatagramSocket(SERVER_PORT);

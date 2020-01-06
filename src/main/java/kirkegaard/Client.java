@@ -94,6 +94,10 @@ public class Client {
         DatagramPacket receivePacket = getNewReceivePacket();
         datagramSocket.receive(receivePacket);
         Message receivedMessage = Message.unMarshall(receivePacket.getData());
+
+        if(receivedMessage.requestID != lastRequestID)
+            getReply(); // Received old duplicate. Discard it and try again.
+
         System.out.println(receivedMessage.messageData);
         return receivedMessage;
     }
