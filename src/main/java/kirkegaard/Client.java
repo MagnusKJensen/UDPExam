@@ -55,15 +55,13 @@ public class Client {
             System.out.println("Enter amount : ");
             return new Input(operation, scanner.nextInt());
         }
-
-        System.out.println();
         return new Input(operation);
     }
 
 
     private void doOperation(Input input) throws IOException {
         // Message containing information such as request type, id and the id of the operation that we wish to perform
-        Message message = new Message(Message.REQUEST_TYPE, ++lastRequestID, input.operation.operationID, input.additionalData);
+        Message message = new Message(Message.REQUEST, ++lastRequestID, input.operation.operationID, input.additionalData);
         byte[] data = message.marshall();
         DatagramPacket requestPacket = new DatagramPacket(data, data.length, serverAddress, SERVER_PORT);
 
@@ -93,9 +91,12 @@ public class Client {
         DatagramPacket receivePacket = allocateReceivePacket();
         datagramSocket.receive(receivePacket);
         Message receivedMessage = Message.unMarshall(receivePacket.getData());
+        System.out.println("RECEIVED : " + receivedMessage.toString());
 
-        if(receivedMessage.requestID != lastRequestID)
-            getReply(); // Received old duplicate. Discard it and try again.
+        if(receivedMessage.requestID != lastRequestID){
+            System.out.println("Received old duplicate packet. Discarding it and trying again.");
+            getReply();
+        }
 
         System.out.println(receivedMessage.messageData);
         return receivedMessage;

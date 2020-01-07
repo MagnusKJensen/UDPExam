@@ -5,6 +5,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Random;
 
 public class Server {
 
@@ -33,6 +34,8 @@ public class Server {
 
     private int accountBalance = 0;
 
+    private Random random = new Random(9999);
+
     public void start() throws IOException {
         serverSocket = new DatagramSocket(SERVER_PORT);
         runServerLoop();
@@ -42,29 +45,36 @@ public class Server {
         running = true;
 
         while (running) {
+            buffer = new byte[DEFAULT_BUFFER_SIZE];
             DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
             serverSocket.receive(receivedPacket);
+            if(random.nextBoolean())
+                continue;
             clientAddress = receivedPacket.getAddress();
             clientPort = receivedPacket.getPort();
 
             Message receivedMessage = Message.unMarshall(receivedPacket.getData());
+            System.out.println("RECEIVED : " + receivedMessage.toString());
             if(receivedMessage.isRequest())
                 processRequest(receivedMessage);
             else if(receivedMessage.isAcknowledgement())
                 processAcknowledgement(receivedMessage);
             // Otherwise just discard message
+
+            System.out.println();
         }
     }
 
     private void processRequest(Message message) throws IOException {
         if(message.requestID <= lastAcknowledgedRequestID){
-            System.out.println("Received old duplicate package, already acknowledged, with request id : " + message.requestID);
-            // The message is an old duplicate and the repsonse has already been acknowledged by the client
+            System.out.println("Received old duplicate packet, already acknowledged, with request id : " + message.requestID);
+            System.out.println("Ignoring packet");
+            // The message is an old duplicate and the response has already been acknowledged by the client
             return;
         }
 
         if(message.requestID <= lastProcessedRequestID){
-            System.out.println("Received old duplicate package with request id : " + message.requestID);
+            System.out.println("Received request that had already been processed. ID : " + message.requestID);
             // The operation has already been performed, but acknowledgement of reply has not been received
             // Operations are not idempotent so send copy of previous reply instead of running operation again
             resendReply(message);
@@ -111,29 +121,29 @@ public class Server {
 
     private Message sendReply(Message originalMessage, String replyString) throws IOException {
         Message replyMessage
-                = new Message(Message.REPLY_TYPE, originalMessage.requestID, originalMessage.operation, replyString);
+                = new Message(Message.REPLY, originalMessage.requestID, originalMessage.operation, replyString);
 
         sendMessageToClient(replyMessage);
         return replyMessage;
     }
 
-    private void resendReply(Message message) throws IOException {
+    private void resendReply(Message requestMsg) throws IOException {
         // Find reply
         for(Message savedReply: savedReplies) {
-            if (savedReply.requestID == message.requestID) {
-                sendMessageToClient(message);
+            if (savedReply.requestID == requestMsg.requestID) {
+                sendMessageToClient(savedReply);
+                System.out.println("Resent reply for request : " + requestMsg.getOperation().name()
+                        + " : \"" + savedReply.messageData + "\"");
                 return;
             }
         }
-
-        System.out.println("Resent reply for request : " + message.getOperation().name()
-                + " : \"" + message.messageData + "\"");
     }
 
     private void sendMessageToClient(Message message) throws IOException {
         byte[] replyData = message.marshall();
         DatagramPacket responsePacket = new DatagramPacket(replyData, replyData.length, clientAddress, clientPort);
-        serverSocket.send(responsePacket);
+        if(random.nextBoolean())
+            serverSocket.send(responsePacket);
     }
 
 

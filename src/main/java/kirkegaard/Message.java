@@ -2,14 +2,11 @@ package kirkegaard;
 
 import org.apache.commons.lang3.SerializationUtils;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
 public class Message implements Serializable {
 
-    public static final int REQUEST_TYPE = 0, REPLY_TYPE = 1, ACKNOWLEDGEMENT = 2;
+    public static final int REQUEST = 0, REPLY = 1, ACKNOWLEDGEMENT = 2;
 
     public final int messageType; // 0 = request, 1 = reply, ack = 2
     public final int requestID;
@@ -36,7 +33,7 @@ public class Message implements Serializable {
     }
 
     public boolean isRequest() {
-        return messageType == REQUEST_TYPE;
+        return messageType == REQUEST;
     }
 
     public boolean isAcknowledgement() {
@@ -49,5 +46,21 @@ public class Message implements Serializable {
 
     public int getNumber() {
         return Integer.parseInt(messageData);
+    }
+
+    @Override
+    public String toString() {
+        return "Message{" +
+                "MessageType : " + getMessageTypeName() +
+                ", requestID = " + requestID +
+                ", operation = " + getOperation().name() +
+                ", messageData = '" + messageData + '\'' +
+                '}';
+    }
+
+    private String getMessageTypeName() {
+        if(messageType == 0) return "REQUEST";
+        if(messageType == 1) return "REPLY";
+        else return "ACKNOWLEDGEMENT";
     }
 }
