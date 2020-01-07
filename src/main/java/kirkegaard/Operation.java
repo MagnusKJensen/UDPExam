@@ -2,7 +2,7 @@ package kirkegaard;
 
 public enum Operation {
 
-    VIEW_BALANCE(1), DEPOSIT(2), WITHDRAW(3), STOP(-1);
+    VIEW_BALANCE(1), DEPOSIT(2), WITHDRAW(3), EXIT(-1);
 
     public final int operationID;
 
@@ -15,6 +15,6 @@ public enum Operation {
             if (operationID == operation.operationID) return operation;
 
         // Default
-        return STOP;
+        return EXIT;
     }
 }

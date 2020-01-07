@@ -16,13 +16,13 @@ public class Client {
     private static final int REQUEST_TIME_OUT_MS = 5000;
     private static final int ASSUMED_SERVER_FAILURE_TIMEOUT = REQUEST_TIME_OUT_MS * 5;
 
-    private DatagramSocket datagramSocket;
+    private final int DEFAULT_BUFFER_SIZE = 256;
     private final int CLIENT_PORT = 25566;
     private final int SERVER_PORT = 25565;
     private InetAddress serverAddress;
+    private DatagramSocket datagramSocket;
 
-    private final int DEFAULT_BUFFER_SIZE = 256;
-    private byte[] msgBuffer = new byte[DEFAULT_BUFFER_SIZE];
+
 
     private boolean running = false;
     private int lastRequestID = -1;
@@ -37,7 +37,7 @@ public class Client {
         while (running) {
             Input userInput = promptUser();
 
-            if(userInput.operation == Operation.STOP) break;
+            if(userInput.operation == Operation.EXIT) break;
 
             doOperation(userInput);
         }
@@ -65,7 +65,6 @@ public class Client {
         // Message containing information such as request type, id and the id of the operation that we wish to perform
         Message message = new Message(Message.REQUEST_TYPE, ++lastRequestID, input.operation.operationID, input.additionalData);
         byte[] data = message.marshall();
-
         DatagramPacket requestPacket = new DatagramPacket(data, data.length, serverAddress, SERVER_PORT);
 
         int totalWaitTime = 0;
@@ -91,7 +90,7 @@ public class Client {
     }
 
     private Message getReply() throws IOException {
-        DatagramPacket receivePacket = getNewReceivePacket();
+        DatagramPacket receivePacket = allocateReceivePacket();
         datagramSocket.receive(receivePacket);
         Message receivedMessage = Message.unMarshall(receivePacket.getData());
 
@@ -110,7 +109,7 @@ public class Client {
         System.out.println("Sent ack for reply : " + replyMessage.requestID + "\n");
     }
 
-    private DatagramPacket getNewReceivePacket() {
+    private DatagramPacket allocateReceivePacket() {
         byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
         return new DatagramPacket(buffer, buffer.length);
     }

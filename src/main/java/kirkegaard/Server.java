@@ -12,19 +12,26 @@ public class Server {
         new Server().start();
     }
 
-    private int lastAcknowledgedRequestID = -1;
-    private int lastProcessedRequestID = -1;
-
     private boolean running = false;
-    private byte[] buffer = new byte[256];
 
     private DatagramSocket serverSocket;
     private final int SERVER_PORT = 25565;
     private InetAddress clientAddress;
     private int clientPort;
 
-    private int accountBalance = 0;
+    private final int DEFAULT_BUFFER_SIZE = 256;
+    private byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
+
+    // Last request for which the final acknowledgement has been received
+    private int lastAcknowledgedRequestID = -1;
+    // The last request that has been processed and replied to
+    private int lastProcessedRequestID = -1;
+
+    // Since operations are not idempotent, replies are saved to avoid having to execute operations again
+    // in cases where the reply packet gets lost
     ArrayList<Message> savedReplies = new ArrayList<>();
+
+    private int accountBalance = 0;
 
     public void start() throws IOException {
         serverSocket = new DatagramSocket(SERVER_PORT);
@@ -67,15 +74,15 @@ public class Server {
         doOperation(message);
     }
 
-    private void resendReply(Message message) throws IOException {
-        // Find reply
-        for(Message savedReply: savedReplies){
-            if(savedReply.requestID == message.requestID){
-                sendMessageToClient(message);
-                return;
-            }
-        }
-        System.out.println("Resent reply for request : " + message.getOperation().name() + ", " + message.messageData);
+    private void processAcknowledgement(Message ackMessage) {
+        int ackID = ackMessage.requestID;
+
+        // The saved reply for this request and all preceding requests can now be deleted,
+        // because the client has acknowledged that it has received them
+        savedReplies.removeIf((m) -> m.requestID <= ackID);
+        if(ackID > lastAcknowledgedRequestID) lastAcknowledgedRequestID = ackID;
+
+        System.out.println("Processed acknowledgement of request " + ackMessage.requestID);
     }
 
     private void doOperation(Message message) throws IOException {
@@ -99,13 +106,28 @@ public class Server {
         lastProcessedRequestID = message.requestID;
         Message reply = sendReply(message, responseString);
         savedReplies.add(reply);
-        System.out.println("Sent reply : " + responseString);
+        System.out.println("Sent reply : \"" + responseString + "\"");
     }
 
     private Message sendReply(Message originalMessage, String replyString) throws IOException {
-        Message replyMessage = new Message(Message.REPLY_TYPE, originalMessage.requestID, originalMessage.operation, replyString);
+        Message replyMessage
+                = new Message(Message.REPLY_TYPE, originalMessage.requestID, originalMessage.operation, replyString);
+
         sendMessageToClient(replyMessage);
         return replyMessage;
+    }
+
+    private void resendReply(Message message) throws IOException {
+        // Find reply
+        for(Message savedReply: savedReplies) {
+            if (savedReply.requestID == message.requestID) {
+                sendMessageToClient(message);
+                return;
+            }
+        }
+
+        System.out.println("Resent reply for request : " + message.getOperation().name()
+                + " : \"" + message.messageData + "\"");
     }
 
     private void sendMessageToClient(Message message) throws IOException {
@@ -114,11 +136,5 @@ public class Server {
         serverSocket.send(responsePacket);
     }
 
-    private void processAcknowledgement(Message ackMessage) {
-        int ackID = ackMessage.requestID;
-        savedReplies.removeIf((m) -> m.requestID == ackID);
-        if(ackID > lastAcknowledgedRequestID) lastAcknowledgedRequestID = ackID;
 
-        System.out.println("Processed acknowledgement of request " + ackMessage.requestID);
-    }
 }
